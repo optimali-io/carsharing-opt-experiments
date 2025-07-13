@@ -1,0 +1,27 @@
+[project]
+name = "fleet_manager"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "cython>=3.1.2",
+    "dotenv>=0.9.9",
+    "fastkml>=1.1.0",
+    "fiona>=1.10.1",
+    "folium>=0.20.0",
+    "huey>=2.5.3",
+    "lxml>=6.0.0",
+    "numpy>=2.3.1",
+    "pandas>=2.3.1",
+    "pydantic>=2.11.7",
+    "pydantic-settings>=2.10.1",
+    "pyproj>=3.7.1",
+    "redis>=6.2.0",
+    "retry>=0.9.2",
+    "rtree>=1.4.0",
+    "scikit-learn>=1.7.0",
+    "setuptools>=80.9.0",
+    "shapely>=2.1.1",
+    "sqlalchemy>=2.0.41",
+]
