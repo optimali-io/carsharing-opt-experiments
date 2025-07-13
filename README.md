@@ -18,7 +18,7 @@ This repository contains tools and scripts to run experiments on carsharing flee
 
 ## Sample data
 
-Synthetic datasets containing rents, user app openings, vehicle statuses and zone borders along with reference resources (hexagonal grid, travel time and distance matrices and petrol station locations) can be downloaded from AWS S3 at `[https://carsharing-sample-data.s3.eu-west-1.amazonaws.com/raw-data/]`.
+Synthetic datasets containing rents, user app openings, vehicle statuses and zone borders along with reference resources (hexagonal grid, travel time and distance matrices and petrol station locations) can be downloaded from AWS S3 at `[https://carsharing-sample-data.s3.eu-west-1.amazonaws.com/]`.
 
 ## License
 The project is released under the Mozilla Public License 2.0.
