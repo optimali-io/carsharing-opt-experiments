@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     RESULTS_DIR: str = MAIN_PATH + "/results"
     ZONES_PATH: str = DATA_DIR + "/zones"
     SPATIAL_INDEX_PATH: str =DATA_DIR + "/spatial_index/spatial_index"
+    ZOME_FILES_DIR: str = DATA_DIR + "/zone_files"
 
 
     SDESIGNER_DIR: str = MAIN_PATH + "/sdesigner"

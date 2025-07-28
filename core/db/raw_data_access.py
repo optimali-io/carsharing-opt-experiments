@@ -103,7 +103,7 @@ def load_vehicles_frame(
         pd.to_numeric, errors="coerce"
     )
     cell_ids = [
-        get_cell_id_by_coords(lon=row.lon, lat=row.lat, index=spatial_index)
+        get_cell_id_by_coords(lon=row.lng, lat=row.lat, index=spatial_index)
         for row in vehicles.itertuples(index=False)
     ]
     vehicles["cell_id"] = cell_ids
@@ -144,7 +144,7 @@ def load_vehicles_from_zone(
         vehicle_models = VehicleModels.model_validate(json.load(f))
 
     for i, v in enumerate(vehicles.itertuples()):
-        lon, lat = v.lon, v.lat
+        lon, lat = v.lng, v.lat
         model = vehicle_models.models[v.model]
         vehicle = Vehicle(
             vehicle_index=i,

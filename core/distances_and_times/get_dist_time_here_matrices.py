@@ -3,31 +3,64 @@ import logging
 import os
 import sys
 from copy import deepcopy
-from typing import List, Tuple
+from typing import List, Tuple, Any
 
 import numpy as np
+import requests
+from pydantic import BaseModel
 
 from core.utils.request_helpers import make_get_request
 
 log = logging.getLogger("core")
 
 
+class HereApiWaypoint(BaseModel):
+    """
+    Class representing a waypoint in HERE API request.
+    """
+
+    lat: float
+    lng: float
+
+    def __str__(self):
+        return f"{self.lat:.4f},{self.lng:.4f}"
+
+
+class HereApiMatrixRequest(BaseModel):
+    origins: list[HereApiWaypoint]
+    destinations: list[HereApiWaypoint]
+    regionDefinition: dict[str, str] = {"type": "world"}
+    matrixAttributes: list[str] = ["travelTimes", "distances"]
+    departureTime: str
+
+class HereMatrix(BaseModel):
+    numOrigins: int
+    numDestinations: int
+    distances: list[int] # meters
+    travelTimes: list[int] # seconds
+    errors: list[int] | None = None
+
+    def get_distance_time(self, origin_index: int, destination_index: int) -> tuple[int, int]:
+        idx = origin_index * self.numDestinations + destination_index
+        return self.distances[idx], self.travelTimes[idx]
+
+class HereApiMatrixResponse(BaseModel):
+    matrixId: str
+    matrix: HereMatrix
+
+
 class DistanceTimeMatrixCreator:
     """Class responsible for making time and distance matrices."""
 
-    here_url = "https://matrix.route.ls.hereapi.com/routing/7.2/calculatematrix.json"
-
-    params = {
-        "apiKey": os.getenv("HERE_API_KEY"),
-        "mode": "balanced;car;traffic:disabled",
-        "summaryAttributes": "traveltime,distance,routeId,costfactor",
-    }
+    here_url = "https://matrix.router.hereapi.com/v8/matrix"
 
     def get_distance_and_time_matrices(
-        self, starts_coor: np.array = None, destinations_coor: np.array = None, datetime: dt.datetime = None
+        self,
+        starts_coor: np.array,
+        destinations_coor: np.array,
     ) -> Tuple[np.array, np.array]:
         """
-        HERE Matrix Routing API version: 7
+        HERE Matrix Routing API version: 8
 
         Method returns distance and time matrices of size MxN where M is number of start points and N is
         number of destination points. Because Here API does not allow making requests for matrices
@@ -35,52 +68,59 @@ class DistanceTimeMatrixCreator:
 
         :param starts_coor: numpy array of size Mx2 containing lon,lat coordinates of starting points
         :param destinations_coor: numpy array of size Nx2 containing lon,lat coordinates of starting points
-        :param datetime: datetime.datetime for distance and time calculation
+        :param departure_datetime: datetime.datetime for distance and time calculation
         :return: distances numpy array of size MxN, times numpy array of size MxN
         """
-        nb_starts: int = 15
-        nb_destinations: int = 100
+        nb_starts: int = 15 # Hardcoded value, as HERE API allows max 15 origins per request. Non configurable.
+        nb_destinations: int = 100 # Hardcoded value, as HERE API allows max 100 destinations per request. Non configurable.
         len_starts = len(starts_coor)
         len_destinations = len(destinations_coor)
 
+        departure_timestring = "any"
+        url = self.here_url + "?" + f"apiKey={os.getenv("HERE_API_KEY")}" + "&async=false"
+
         log.info("prepare main matrices")
-        times: np.array = np.zeros(shape=[len_starts, len_destinations], dtype=np.uint32)
-        distances: np.array = np.zeros(shape=[len_starts, len_destinations], dtype=np.uint32)
+        times: np.array = np.zeros(
+            shape=[len_starts, len_destinations], dtype=np.uint32
+        )
+        distances: np.array = np.zeros(
+            shape=[len_starts, len_destinations], dtype=np.uint32
+        )
 
         log.info("prepare list of starts idx and destinations idx")
         n_start_arrays = np.ceil(len_starts / nb_starts)
-        starts_indices: List[np.array] = np.array_split(np.arange(len_starts), n_start_arrays)
+        starts_indices: List[np.array] = np.array_split(
+            np.arange(len_starts), n_start_arrays
+        )
         n_dest_arrays = np.ceil(len_destinations / nb_destinations)
-        destinations_indices: List[np.array] = np.array_split(np.arange(len_destinations), n_dest_arrays)
+        destinations_indices: List[np.array] = np.array_split(
+            np.arange(len_destinations), n_dest_arrays
+        )
         i = 0
 
         log.info("loading matrices from HERE")
         for s_indices in starts_indices:
             for d_indices in destinations_indices:
+                request = HereApiMatrixRequest(
+                    origins=[HereApiWaypoint(lat=starts_coor[idx, 1], lng=starts_coor[idx, 0]) for idx in s_indices],
+                    destinations=[HereApiWaypoint(lat=destinations_coor[idx, 1], lng=destinations_coor[idx, 0]) for idx in d_indices],
+                    departureTime=departure_timestring,
+                )
+                request_json = request.model_dump()
+                response_raw = requests.post(url, json=request_json)
 
-                query_params = deepcopy(self.params)
-
-                for request_idx, coords_idx in enumerate(s_indices):
-                    query_params[
-                        f"start{request_idx}"
-                    ] = f"{starts_coor[coords_idx, 1]:.4f},{starts_coor[coords_idx, 0]:.4f}"
-
-                for request_idx, coords_idx in enumerate(d_indices):
-                    query_params[
-                        f"destination{request_idx}"
-                    ] = f"{destinations_coor[coords_idx, 1]:.4f},{destinations_coor[coords_idx, 0]:.4f}"
-                query_string = "&".join([f"{k}={v}" for k, v in query_params.items()])
-                response = make_get_request(self.here_url + query_string)
-                response = response["response"]["matrixEntry"]
-
+                response = HereApiMatrixResponse.model_validate(response_raw.json())
+                matrix: HereMatrix = response.matrix
                 # process response
-                for data in response:
-                    start_id = data["startIndex"]
-                    destination_id = data["destinationIndex"]
-                    times[s_indices[start_id], d_indices[destination_id]] = data["summary"]["travelTime"]
-                    distances[s_indices[start_id], d_indices[destination_id]] = data["summary"]["distance"]
+                for i, sidx in enumerate(s_indices):
+                    for j, didx in enumerate(d_indices):
+                        distance, time = matrix.get_distance_time(origin_index=i, destination_index=j)
+                        distances[sidx, didx] = distance
+                        times[sidx, didx] = time
 
-                progress = (i + 1) / (len(starts_indices) * len(destinations_indices)) * 100
+                progress = (
+                    (i + 1) / (len(starts_indices) * len(destinations_indices)) * 100
+                )
                 sys.stdout.write("\rDownloaded: {:.1f}%, Nb: {}".format(progress, i))
                 sys.stdout.flush()
                 i += 1
@@ -124,12 +164,14 @@ class DistanceTimeMatrixCreator:
                 best_station_id = -1
                 for station_id in range(n_stations):
                     time = int(
-                        time_cell_station[start_cell, station_id] + time_station_cell[station_id, destination_cell]
+                        time_cell_station[start_cell, station_id]
+                        + time_station_cell[station_id, destination_cell]
                     )
                     if time < min_time:
                         min_time = time
                         min_distance = int(
-                            dist_cell_station[start_cell, station_id] + dist_station_cell[station_id, destination_cell]
+                            dist_cell_station[start_cell, station_id]
+                            + dist_station_cell[station_id, destination_cell]
                         )
                         best_station_id = station_id
                 distance_cell_station_cell[start_cell, destination_cell] = min_distance

@@ -139,7 +139,6 @@ if __name__ == '__main__':
     create_dist_time_matrices(snapping_points_path=os.path.join(config.ZONE_FILES_DIRECTORY, 'snapped_point_from_centroids.shp'),
                               petrol_stations_path=os.path.join(config.ZONE_FILES_DIRECTORY, 'petrol_stations.csv'),
                               output_dir=config.ZONE_FILES_DIRECTORY,
-                              date_time=dt.datetime(2021, 3, 21, 0)) 
 ```
 Run script!
 

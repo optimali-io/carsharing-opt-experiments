@@ -344,11 +344,11 @@ def create_nearest_petrol_station_distance(
 
     log.info("loading cell-station distance and time matrices from HERE api")
     distances_cs, times_cs = dmc.get_distance_and_time_matrices(
-        starts_coor=start_coors, destinations_coor=end_coords, datetime=start_date
+        starts_coor=start_coors, destinations_coor=end_coords
     )
     log.info("loading station-cell distance and time matrices from HERE api")
     distances_sc, times_sc = dmc.get_distance_and_time_matrices(
-        starts_coor=end_coords, destinations_coor=start_coors, datetime=start_date
+        starts_coor=end_coords, destinations_coor=start_coors
     )
 
     log.info("flattening matrices to 1d")

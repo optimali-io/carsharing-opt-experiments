@@ -24,4 +24,5 @@ dependencies = [
     "setuptools>=80.9.0",
     "shapely>=2.1.1",
     "sqlalchemy>=2.0.41",
+    "tqdm>=4.67.1",
 ]

@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 
 from config import huey
 from core.tasks.data_preparation import (
@@ -83,10 +84,12 @@ def prepare_base_data_if_not_exist(experiment_config: ExperimentConfig):
             create_nearest_petrol_station_distance(
                 zone_id=base_zone_id,
                 cell_ids=cell_ids,
-                start_date=start_date,
+                start_date=datetime(start_date.year, start_date.month, start_date.day, hour=23, minute=59),
                 out_zone=data_config_zone_id,
             )
         )
+
     )
+
     result = huey.enqueue(pipeline)
     result.get(blocking=True)

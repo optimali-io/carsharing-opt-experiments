@@ -44,13 +44,13 @@ def optimise_zone_with_data_preparation(zone_id: str, date_time_string: str):
 
 
 def run_sdesigner_experiment(experiment_id: str, prepare_data: bool = True):
-    r = run_gridsearch(experiment_id=experiment_id, prepare_data=prepare_data)
+    r = run_gridsearch.call_local(experiment_id=experiment_id, prepare_data=prepare_data)
 
 
 
 if __name__ == "__main__":
     # Example usage
     zone_id = "lodz"
-    date_time_string = "2019-09-30 12:00:00"
-    run_sdesigner_experiment("lodz_experyment", prepare_data=False)
+    date_time_string = "2019-09-29 12:00:00"
+    run_sdesigner_experiment("lodz_experyment", prepare_data=True)
 

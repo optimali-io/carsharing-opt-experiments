@@ -3,7 +3,6 @@ import logging
 from huey import RedisHuey
 from huey.api import Task
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
 
 from settings import Settings
 
