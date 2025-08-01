@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     RESULTS_DIR: str = MAIN_PATH + "/results"
     ZONES_PATH: str = DATA_DIR + "/zones"
     SPATIAL_INDEX_PATH: str =DATA_DIR + "/spatial_index/spatial_index"
-    ZOME_FILES_DIR: str = DATA_DIR + "/zone_files"
+    REFERENCE_GRID_PATH: str = DATA_DIR + "/reference_grid"
 
 
     SDESIGNER_DIR: str = MAIN_PATH + "/sdesigner"
@@ -35,4 +35,8 @@ class Settings(BaseSettings):
     # HERE
     HERE_API_KEY: str = get_env_or_raise("HERE_API_KEY")
     HERE_APP_ID: str = get_env_or_raise("HERE_APP_ID")
+
+    # configuration
+    demand_lag_days: int = 7
+    directions_lag_weeks: int = 1
 

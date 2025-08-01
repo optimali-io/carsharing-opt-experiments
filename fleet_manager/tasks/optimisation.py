@@ -3,6 +3,8 @@ import logging
 import os.path
 import pickle
 import random
+from itertools import chain
+from multiprocessing import Pool
 from time import sleep
 from typing import Dict, List, Union
 
@@ -19,68 +21,25 @@ from fleet_manager.data_model.genetic_model import Phenotype, OptimisationResult
 from fleet_manager.data_model.config_models import GeneticConfiguration, ScienceConfig
 from fleet_manager.data_model.zone_model import ZoneData
 from fleet_manager.genetic_algorithm.genetic_controller_parallel import (
-    GeneticControllerParallelDynamic,
+    GeneticControllerParallelDynamicIslands,
 )
 from fleet_manager.genetic_algorithm.genetic_worker import (
-    IGeneticWorkersRunner,
     run_genetic_worker,
 )
+from fleet_manager.genetic_algorithm.runners import IGeneticWorkersRunner
 from fleet_manager.genetic_output_builder.map_plotter import MapPlotter
 from fleet_manager.tasks.build_stations import build_gas_stations, build_power_stations
 
 base_logger = logging.getLogger("fleet_manager")
 
 
-class HueyGeneticWorkersRunner(IGeneticWorkersRunner):
-    """
-    Class responsible for creation and control of single epoch data_preparation.
-    """
-
-    def __init__(self, configuration: GeneticConfiguration, zone_data: ZoneData):
-        self._configuration: GeneticConfiguration = configuration
-        self._zone_data: ZoneData = zone_data
-        self.zone_data_id: str = str(dt.datetime.now().timestamp())
-        self._store_zone_data()
-
-    def _store_zone_data(self):
-        """Serialize ZoneData instance and put it in Redis"""
-        base_logger.info(f"serializing zone data")
-        serialized_zone_data = pickle.dumps(self._zone_data)
-        base_logger.info(f"storing zone data in redis")
-        store_data_in_redis(self.zone_data_id, serialized_zone_data)
-
-    def run_workers(self, clusters: List[List[Phenotype]]) -> List[Phenotype]:
-        """
-        Create as many data_preparation as a number of clusters, execute them and get results.
-        :param clusters: list of lists (subpopulations) of the Phenotype instances.
-        :return: flattened list of Phenotypes from all processed clusters
-        """
-        pending: List[Union[Result, None]] = []
-        new_population: List[Phenotype] = []
-        population_size = 0
-        base_logger.info(f"running workers for {len(clusters)} clusters")
-
-        for cluster in clusters:
-            pending.append(
-                run_genetic_worker_task(cluster, self._configuration, self.zone_data_id)
-            )
-            population_size += len(cluster)
-
-        while len(new_population) < population_size:
-            for i in range(len(pending)):
-                if pending[i]:
-                    sub_pop = pending[i]()
-                    if sub_pop:
-                        new_population.extend(sub_pop)
-                        pending[i] = None
-                else:
-                    continue
-            sleep(0.1)
-        return new_population
-
-
 @huey.task(context=True)
-def load_zone_data(science_config: ScienceConfig, optimisation_datetime: dt.datetime, task=None) -> tuple[ScienceConfig, ZoneData]:
+def load_zone_data(
+    science_config: ScienceConfig,
+    optimisation_datetime: dt.datetime,
+    task=None,
+    finished: bool | None = None,
+) -> tuple[ScienceConfig, ZoneData]:
     """
     Load:
         - Demand prediction matrix(.npy) from Redis by zone_id for given hour
@@ -105,7 +64,12 @@ def load_zone_data(science_config: ScienceConfig, optimisation_datetime: dt.date
     from_date = optimisation_datetime.date()
 
     log.info("loading demand")
-    zone_data.demand = np.sum(daf.find_demand_prediction_array(zone_id=zone_id, from_date=from_date)[from_date.weekday()], 0)
+    zone_data.demand = np.sum(
+        daf.find_demand_prediction_array(zone_id=zone_id, from_date=from_date)[
+            from_date.weekday()
+        ],
+        0,
+    )
     log.info(f"demand sum: {np.sum(zone_data.demand)}")
     log.info("loading revenue")
     zone_data.revenue = daf.find_revenue_array(zone_id=zone_id, from_date=from_date)
@@ -120,7 +84,9 @@ def load_zone_data(science_config: ScienceConfig, optimisation_datetime: dt.date
     zone_data.time_cell_cell = daf.find_time_cell_cell_array(zone_id)
     log.info(f"time sum: {np.sum(zone_data.time_cell_cell)}")
     log.info("loading station distances")
-    zone_data.distance_cell_station_cell = daf.find_distance_cell_station_cell_array(zone_id)
+    zone_data.distance_cell_station_cell = daf.find_distance_cell_station_cell_array(
+        zone_id
+    )
     log.info(f"distance station sum: {np.sum(zone_data.distance_cell_station_cell)}")
     log.info("loading station times")
     zone_data.time_cell_station_cell = daf.find_time_cell_station_cell_array(zone_id)
@@ -128,7 +94,7 @@ def load_zone_data(science_config: ScienceConfig, optimisation_datetime: dt.date
     log.info("loading station ids")
     zone_data.id_cell_station_cell = daf.find_id_cell_station_cell_array(zone_id)
 
-    # service teamss
+    # service teams
     daf = DataAccessFacadeBasic()
     zone_data.service_team = daf.load_service_teams(zone_id)
 
@@ -136,14 +102,18 @@ def load_zone_data(science_config: ScienceConfig, optimisation_datetime: dt.date
     zone_data.fleet = load_vehicles_from_zone(science_config, optimisation_datetime)
 
     zone_data.init_zone_data()
-    zone_data.gas_station = build_gas_stations(daf.find_gas_stations(zone_id), zone_data)
+    zone_data.gas_station = build_gas_stations(
+        daf.find_gas_stations(zone_id), zone_data
+    )
 
     log.info("initializing zone data")
     log.info(f"n vehicles to refuel: {len(zone_data.fleet_ids_to_refuel)}")
-    log.info(f"vehicles to refuel ranges: {[zone_data.fleet[idx].range for idx in zone_data.fleet_ids_to_refuel]}")
+    log.info(
+        f"vehicles to refuel ranges: {[zone_data.fleet[idx].range for idx in zone_data.fleet_ids_to_refuel]}"
+    )
     log.info(f"End loading ZoneData")
 
-    return science_config, zone_data, optimisation_datetime
+    return science_config, zone_data
 
 
 @huey.task(context=True)
@@ -203,7 +173,7 @@ def load_zone_data_electric_mock(
     zone_data.id_cell_station_cell = daf.find_id_cell_station_cell_array(zone_id)
 
     zone_data.fleet = load_vehicles_from_zone(science_config)
-    zone_data._initialize_cells()
+    zone_data.initialize_cells()
     zone_data.power_station = build_power_stations(
         daf.find_power_stations(zone_id), zone_data
     )
@@ -261,14 +231,17 @@ def load_zone_data_electric_mock(
 
 @huey.task(context=True)
 def run_genetic_algorithm(
-    science_config: ScienceConfig, zone_data: ZoneData, optimisation_datetime: dt.datetime, task=None
+    science_config: ScienceConfig,
+    zone_data: ZoneData,
+    optimisation_datetime: dt.datetime,
+    task=None,
 ) -> OptimisationResult:
     gconf = science_config.genetic_config
     log = get_task_logging_adapter(base_logger, task)
     log.info("create workers runner")
     worker_runner = HueyGeneticWorkersRunner(gconf, zone_data)
     log.info("create genetic controller")
-    gc = GeneticControllerParallelDynamic(gconf, zone_data)
+    gc = GeneticControllerParallelDynamicIslands(gconf, zone_data)
     gc.set_workers_runner(worker_runner)
     log.info("start genetic algorithm execution")
 
@@ -290,12 +263,11 @@ def run_genetic_algorithm(
     result = OptimisationResult(
         best_phenotype=best_phenotype,
         optimization_time=optimization_time,
-        science_config=science_config
+        science_config=science_config,
     )
     m = create_map(best_phenotype, zone_data, science_config)
     daf.save_optimisation_result(result, optimisation_datetime, m)
-
-
+    return result
 
 
 def store_data_in_redis(key: str, value: Union[str, bytes]):
@@ -342,7 +314,9 @@ def run_genetic_worker_task(
     return run_genetic_worker(population, configuration, zone_data_path)
 
 
-def create_map(phenotype: Phenotype, zone_data: ZoneData, science_config: ScienceConfig) -> Map:
+def create_map(
+    phenotype: Phenotype, zone_data: ZoneData, science_config: ScienceConfig
+) -> Map:
     """
     Create relocation map and return its path.
     :param phenotype: phenotype
@@ -361,3 +335,90 @@ def create_map(phenotype: Phenotype, zone_data: ZoneData, science_config: Scienc
 
     return mp.folium_map
 
+
+class CpuGeneticWorkersRunner(IGeneticWorkersRunner):
+    """
+    Class responsible for creation and control of single epoch data_preparation. It will be used instead of a Huey version
+    if Redis will be unavailable or not necessary (unit tests, experiments)
+    """
+
+    def __init__(
+        self,
+        configuration: GeneticConfiguration,
+        zone_data: ZoneData,
+        zone_data_path: str,
+    ):
+        self._configuration: GeneticConfiguration = configuration
+        self._zone_data_path: str = zone_data_path
+        with open(zone_data_path, "wb") as f:
+            pickle.dump(zone_data, f)
+
+    def run_workers(self, clusters: list[list[Phenotype]]) -> list[Phenotype]:
+        """
+        Execute worker runner on each cluster.
+
+        :param clusters: list of lists (subpopulations) of the Phenotype instances.
+
+        :return: flattened list of Phenotypes from all processed clusters
+        """
+
+        with Pool() as p:
+            return list(
+                chain.from_iterable(
+                    p.starmap(
+                        run_genetic_worker,
+                        [
+                            (c, self._configuration, self._zone_data_path)
+                            for c in clusters
+                        ],
+                    )
+                )
+            )
+
+
+class HueyGeneticWorkersRunner(IGeneticWorkersRunner):
+    """
+    Class responsible for creation and control of single epoch data_preparation.
+    """
+
+    def __init__(self, configuration: GeneticConfiguration, zone_data: ZoneData):
+        self._configuration: GeneticConfiguration = configuration
+        self._zone_data: ZoneData = zone_data
+        self.zone_data_id: str = str(dt.datetime.now().timestamp())
+        self._store_zone_data()
+
+    def _store_zone_data(self):
+        """Serialize ZoneData instance and put it in Redis"""
+        base_logger.info(f"serializing zone data")
+        serialized_zone_data = pickle.dumps(self._zone_data)
+        base_logger.info(f"storing zone data in redis")
+        store_data_in_redis(self.zone_data_id, serialized_zone_data)
+
+    def run_workers(self, clusters: list[list[Phenotype]]) -> list[Phenotype]:
+        """
+        Create as many data_preparation as a number of clusters, execute them and get results.
+        :param clusters: list of lists (subpopulations) of the Phenotype instances.
+        :return: flattened list of Phenotypes from all processed clusters
+        """
+        pending: list[Union[Result, None]] = []
+        new_population: list[Phenotype] = []
+        population_size = 0
+        base_logger.info(f"running workers for {len(clusters)} clusters")
+
+        for cluster in clusters:
+            pending.append(
+                run_genetic_worker_task(cluster, self._configuration, self.zone_data_id)
+            )
+            population_size += len(cluster)
+
+        while len(new_population) < population_size:
+            for i in range(len(pending)):
+                if pending[i]:
+                    sub_pop = pending[i]()
+                    if sub_pop:
+                        new_population.extend(sub_pop)
+                        pending[i] = None
+                else:
+                    continue
+            sleep(0.1)
+        return new_population

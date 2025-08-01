@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 
 def create_rents_and_appstarts_frames(
         lower_date: date, upper_date: date, zone_id: str, cell_ids: list[str]
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
+) -> Tuple[pd.DataFrame, pd.DataFrame] | tuple[None, None]:
     """
     Function creates tuple of rents and appstarts filtered by dates and cell ids.
     """
@@ -39,13 +39,22 @@ def create_rents_and_appstarts_frames(
         from_date=lower_date,
         to_date=upper_date,
     )
+    if rents is None:
+        return None, None
 
     appstarts: pd.DataFrame = daf.find_user_events_frame(
         zone_id=zone_id,
         from_date=lower_date,
         to_date=upper_date,
     )
-    appstarts.event_datetime = pd.to_datetime(appstarts.event_datetime)
+    if appstarts is not None:
+        appstarts.event_datetime = pd.to_datetime(appstarts.event_datetime)
+        appstarts["cell_id"] = cell_id_mapper.map_ids_to_indices(
+            appstarts["cell_id"].to_list()
+        )
+        appstarts = appstarts.sort_values(
+        by="event_datetime"
+        )
     log.info("mapping cell ids for rents and appstarts")
     rents["start_cell_id"] = cell_id_mapper.map_ids_to_indices(
         rents["start_cell_id"].to_list()
@@ -53,13 +62,9 @@ def create_rents_and_appstarts_frames(
     rents["end_cell_id"] = cell_id_mapper.map_ids_to_indices(
         rents["end_cell_id"].to_list()
     )
-    appstarts["cell_id"] = cell_id_mapper.map_ids_to_indices(
-        appstarts["cell_id"].to_list()
-    )
+    rents = rents.sort_values(by="start_date")
+    return rents, appstarts
 
-    return rents.sort_values(by="start_date"), appstarts.sort_values(
-        by="event_datetime"
-    )
 
 
 class DataAccessFacadeBasic:
@@ -114,9 +119,11 @@ class DataAccessFacadeBasic:
 
     def find_rents_frame(
             self, zone_id: str, from_date: date, to_date: date
-    ) -> DataFrame:
+    ) -> DataFrame | None:
         pth = f"{settings.DATA_DIR}/rents/{zone_id}/"
         df = dataframe_from_time_period(pth, from_date, to_date)
+        if df is None:
+            return
         df[["start_lon", "start_lat", "end_lon", "end_lat"]] = df[
             ["start_lon", "start_lat", "end_lon", "end_lat"]
         ].apply(pd.to_numeric, errors="coerce")
@@ -126,10 +133,12 @@ class DataAccessFacadeBasic:
 
     def find_user_events_frame(
             self, zone_id: str, from_date: date, to_date: date
-    ) -> DataFrame:
+    ) -> DataFrame | None:
         """Find user events frame for zone_id and date range"""
         pth = f"{settings.DATA_DIR}/app_events/{zone_id}/"
         df = dataframe_from_time_period(pth, from_date, to_date)
+        if df is None:
+            return
         df[["lon", "lat"]] = df[["lon", "lat"]].apply(pd.to_numeric, errors="coerce")
         df.event_datetime = pd.to_datetime(df.event_datetime, errors="coerce")
 

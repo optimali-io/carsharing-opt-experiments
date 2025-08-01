@@ -29,8 +29,8 @@ class Incubator:
             vehicle_to_refuel_ids: List[int] = c.fleet_ids_to_refuel
             genome: Genome = Genome(len(c.fleet))
             for service_team in self.zone_data.service_team:
-                st_id: int = service_team.service_team_id
-                tw: int = service_team.planned_time_work
+                st_id: int = self.zone_data.service_team_id_by_index_dict[service_team.service_team_id]
+                tw: int = service_team.planned_time_work_minutes
                 team_number: int = service_team.service_team_kind
                 tw *= 1 + random.randint(-g.chromosome_deviation, g.chromosome_deviation) / 100
 
@@ -39,8 +39,8 @@ class Incubator:
                         1,
                         st_id,
                         genome.change_gene_callback,
-                        refuel_time=service_team.refuel_time,
-                        relocation_time=service_team.relocation_time,
+                        refuel_time=service_team.refuel_time_seconds,
+                        relocation_time=service_team.relocation_time_seconds,
                     )
                     action_number: int = int(tw / c.action_duration_1)
                     if action_number < 1:
@@ -61,8 +61,8 @@ class Incubator:
                         2,
                         st_id,
                         genome.change_gene_callback,
-                        refuel_time=service_team.refuel_time,
-                        relocation_time=service_team.relocation_time,
+                        refuel_time=service_team.refuel_time_seconds,
+                        relocation_time=service_team.relocation_time_seconds,
                     )
                     action_number = int(tw / c.action_duration_2)
                     if action_number < 1:

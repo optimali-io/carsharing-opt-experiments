@@ -14,10 +14,13 @@ class GeneticConfiguration(BaseModel):
     maximum_generation_number: int  # maximum number of generation
     maximum_tune_generation_number: int  # maximum number of generation during tune mode
 
+    topography_type: str | None = None  # type of topography used in static islands mode
+    migration_rate: float | None = None # fraction of population to migrate used in static islands mode
     island_population: int  # maximum population size on each island (used in island parallel mode)
     migration_interval: int  # number of generation between migrations (used in island parallel mode)
     n_neighbors: int  # number of neighbors used in similarity graph building
     tolerance: float  # how small should kneighbor graph's laplacian eigenvalues be to be considered as zero
+    neighbor_range:int = 4  # range of neighbors in cellular model
 
     chromosome_deviation: int  # maximum deviation of chromosome in percentages
     tournament_samples: int  # number of samples in tournament selection
@@ -75,7 +78,7 @@ class ZoneDataConfig(BaseModel):
     )
 
     service_exceeded_time_penalty: float = Field(
-        default=0.00,
+        default=0.05,
         description="Penalty cost in adopted currency (e.g. PLN) for 1 second of additional service work.",
     )
     service_refuel_bonus: float = Field(
@@ -85,10 +88,10 @@ class ZoneDataConfig(BaseModel):
         default=15, description="Bonus for each relocation."
     )
     blur_factor: float = Field(
-        default=0.00, description="Blur factor for demand modification."
+        default=0.1, description="Blur factor for demand modification."
     )
     blur_distance: float = Field(
-        default=0.00, description="Blur distance for demand modification [m]."
+        default=800, description="Blur distance for demand modification [m]."
     )
 
 class Zone(BaseModel):

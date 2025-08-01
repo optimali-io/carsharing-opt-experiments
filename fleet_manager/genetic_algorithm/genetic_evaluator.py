@@ -286,7 +286,7 @@ class Evaluator:
             team: ServiceTeam = self.zone_data.service_team[chromosome.service_team_index]
             team_size: int = 1 if chromosome.kind == 1 else 2
             # distance cost
-            self.cost += team.distance_cost * (chromosome.approach_distance + chromosome.relocation_distance) / 1000
+            self.cost += team.distance_cost_per_km * (chromosome.approach_distance + chromosome.relocation_distance) / 1000
             # time cost
             self.cost += team.price_per_refuelling * chromosome.refuelings_number
 
@@ -297,8 +297,8 @@ class Evaluator:
             team: ServiceTeam = self.zone_data.service_team[chromosome.service_team_index]
             team_size: int = 1 if chromosome.kind == 1 else 2
             self.cost += (
-                team.distance_cost * (chromosome.approach_distance + team_size * chromosome.relocation_distance) / 1000
-                + team_size * team.time_cost * chromosome.total_time
+                team.distance_cost_per_km * (chromosome.approach_distance + team_size * chromosome.relocation_distance) / 1000
+                + team_size * team.time_cost_per_second * chromosome.total_time
             )
 
     def _compute_charge_station_occupation(self):
@@ -375,7 +375,7 @@ class Evaluator:
         Compute penalty due to exceeded work time of the service teams.
         """
 
-        planned_time_work_sec: int = self.zone_data.service_team[chromosome.service_team_index].planned_time_work * 60
+        planned_time_work_sec: int = self.zone_data.service_team[chromosome.service_team_index].planned_time_work_minutes * 60
         if planned_time_work_sec < chromosome.total_time:
             self.penalty += (
                 chromosome.total_time - planned_time_work_sec

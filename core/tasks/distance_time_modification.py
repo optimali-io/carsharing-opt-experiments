@@ -26,7 +26,8 @@ def run_distance_modification_approximation(
     start_date: dt.date | None = None,
     output_zone_id: str | None = None,
     task=None,
-) -> Tuple[Dict, dt.date]:
+    finished: bool = False,
+):
     """
     Create and save route distance and time arrays.
     approx_func: distance modifying function F such that F(road distance matrix) -> rent distance matrix.
@@ -86,6 +87,7 @@ def run_distance_modification_approximation(
         zone_id=output_zone_id, route_time_cell_cell_array=route_times
     )
     log.info(f"End distance approximation")
+    return {"finished": True}
 
 
 @huey.task(context=True)
@@ -95,7 +97,8 @@ def run_traffic_factors_task(
     start_date: dt.date | None = None,
     output_zone_id: str | None = None,
     task=None,
-) -> Tuple[Dict, dt.datetime]:
+    finished: bool = False,
+):
     """
     Create rents list and get time traffic factors.
     """
@@ -141,3 +144,4 @@ def run_traffic_factors_task(
         zone_id=output_zone_id, time_traffic_factor_array=ttf
     )
     log.info(f"End calculating time traffic factor")
+    return {"finished": True}

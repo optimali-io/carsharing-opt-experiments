@@ -21,7 +21,7 @@ class FuelType(str, Enum):
     ELECTRIC = 2
 
 class VehicleModel(BaseModel):
-    average_fuel_consumption: float
+    average_fuel_consumption: float # l/100km
     tank_capacity: float
     fuel_type: FuelType
 
@@ -158,13 +158,13 @@ class ServiceTeam(BaseModel):
     service_team_id: int
     service_team_name: str
     service_team_kind: int
-    planned_time_work: int
-    time_cost: float
-    distance_cost: float
+    planned_time_work_minutes: int
+    time_cost_per_second: float
+    distance_cost_per_km: float
     start_cell_id: int = -1
     end_cell_id: int = -1
-    refuel_time: int = 1080
-    relocation_time: int = 480
+    refuel_time_seconds: int = 1080
+    relocation_time_seconds: int = 480
     price_per_relocation: float | None = None
     price_per_refuelling: float | None = None
 
@@ -252,7 +252,7 @@ class ZoneData(BaseModel):
         Method initializes factors, revenues and values in ZoneData.
         """
         self._set_allowed_cells()
-        self._initialize_cells()
+        self.initialize_cells()
         self._initialize_fleet()
         self._initialize_service_teams()
         self._compute_base_revenue()
@@ -314,7 +314,7 @@ class ZoneData(BaseModel):
                 src_cell_id += 1
                 radius = self.relocation_max_distance
 
-    def _initialize_cells(self) -> None:
+    def initialize_cells(self) -> None:
         """Creates list of Cell objects and sets their 'in_zone' value."""
         for i, cell_id in enumerate(self.client_cell_ids):
             lon, lat = cell_id.split("-")

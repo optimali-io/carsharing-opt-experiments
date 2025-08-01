@@ -25,3 +25,4 @@ def simulate(simulate_in: ParallelSimulateIn, task=None):
     )
     daf = DataAccessFacadeBasic()
     daf.save_simulation_result(result)
+    return True

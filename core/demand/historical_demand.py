@@ -35,7 +35,7 @@ class GetHistoricalDemand:
 
     def __init__(self, rents_df: pd.DataFrame, appstarts_df: pd.DataFrame):
         self.rents_df: pd.DataFrame = rents_df
-        self.appstarts_df: pd.DataFrame = pd.DataFrame(appstarts_df[self.appstart_columns])
+        self.appstarts_df: pd.DataFrame = pd.DataFrame(appstarts_df[self.appstart_columns]) if appstarts_df is not None else pd.DataFrame(columns=self.appstart_columns)
         self.appstarts_df["info"] = "appstart"
         self.appstarts_df.columns = self.timeseries_columns
 

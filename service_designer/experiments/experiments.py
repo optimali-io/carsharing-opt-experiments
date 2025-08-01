@@ -2,9 +2,6 @@ import logging
 from copy import deepcopy
 from typing import List
 
-import logging
-from typing import List
-
 import numpy as np
 
 from service_designer.data.data_config import ExperimentConfig
@@ -34,7 +31,7 @@ class Experiment:
 
     def run_experiment(self):
         """This function runs experiment"""
-        log.info("loading base data")
+        print("loading base data")
         base_data = load_base_data(self.experiment_config)
         subzones_list = SubzonesGenerator(self.experiment_config).generate_subzones()
         price_list = PriceList(self.experiment_config.price_list_config.model_dump())
@@ -43,7 +40,7 @@ class Experiment:
         for subzone in subzones_list:
             subzone.generate_zone_mask(base_data.cell_ids)
             for vehicles_nbr in self.experiment_config.vehicle_count_set:
-                log.info(
+                print(
                     f"putting vehicles to best cells for vehicles number {vehicles_nbr} and subzone {subzone.id}"
                 )
                 vehicles = self._put_vehicles_to_best_cells(
@@ -72,7 +69,7 @@ class Experiment:
                                 simulate_in, price_list
                             )
                             simulate_in_list.append(parallel_simulate_in)
-                            log.info(
+                            print(
                                 f"creating simulation for vehicles number {vehicles_nbr}, service actions number {service_actions_nbr}, relocation actions proportion {relocation_actions_proportion}"
                             )
                     else:
@@ -87,15 +84,22 @@ class Experiment:
                         )
                         parallel_simulate_in = ParallelSimulateIn(simulate_in, price_list)
                         simulate_in_list.append(parallel_simulate_in)
-                        log.info(
+                        print(
                             f"creating simulation for vehicles number {vehicles_nbr}, service actions number {service_actions_nbr}"
                         )
         simulations_count = len(simulate_in_list)
+        results = []
         if simulations_count == 0:
-            log.info("No simulations to run. Check Experiment configuration.")
+            print("No simulations to run. Check Experiment configuration.")
         else:
             for si in simulate_in_list:
-                simulate(si)
+                results.append(simulate(si))
+
+        for r in results:
+            r.get(blocking=True)
+
+        print(f"Experiment {self.experiment_config.name} completed with {len(results)} simulations.")
+
 
     def _put_vehicles_to_best_cells(
         self, rent_demand: np.array, zone_mask: np.array, vehicles_nbr: int

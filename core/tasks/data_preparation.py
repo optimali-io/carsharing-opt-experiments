@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from shapely.geometry import Polygon
 
-from config import huey, get_task_logging_adapter
+from config import huey, get_task_logging_adapter, settings
 from core.db.data_access_facade_basic import (
     DataAccessFacadeBasic,
     create_rents_and_appstarts_frames,
@@ -39,41 +39,45 @@ def calculate_historical_demand(
     """
     Calculate historical demand matrix for given Zone and date and store it.
     """
-    log = get_task_logging_adapter(base_logger, task)
     print(f"Begin calculate historical demand for zone {zone_id} and date {today}")
-    upper_date = dt.datetime(today.year, today.month, today.day, 0)
+    try:
+        upper_date = dt.datetime(today.year, today.month, today.day, 0)
 
-    lower_date = upper_date - dt.timedelta(
-        days=2
-    )  # we need two days to catch unfinished rents
-    date_day_before = pd.Timestamp(upper_date - dt.timedelta(days=1)).tz_localize(
-        "utc"
-    )  # needed to filter demand points after calculation
+        lower_date = upper_date - dt.timedelta(
+            days=2
+        )  # we need two days to catch unfinished rents
+        date_day_before = pd.Timestamp(upper_date - dt.timedelta(days=1)).tz_localize(
+            "utc"
+        )  # needed to filter demand points after calculation
 
-    print(f"loading rents and appstarts")
-    rents, appstarts = create_rents_and_appstarts_frames(
-        lower_date.date(), upper_date.date(), zone_id, cell_ids
-    )
+        print(f"loading rents and appstarts")
+        rents, appstarts = create_rents_and_appstarts_frames(
+            lower_date.date(), upper_date.date(), zone_id, cell_ids
+        )
+        if rents is None:
+            return True
 
-    gd = GetHistoricalDemand(rents_df=rents, appstarts_df=appstarts)
-    print(f"get demand")
-    df = gd.get_demand()
-    df = df.loc[df["time"] > date_day_before]
+        gd = GetHistoricalDemand(rents_df=rents, appstarts_df=appstarts)
+        print(f"get demand")
+        df = gd.get_demand()
+        df = df.loc[df["time"] > date_day_before]
 
-    n_cells = len(cell_ids)
-    print(f"aggregate demand")
-    demand_history_hc = GetHistoricalDemand.aggregate_demand(df, n_cells)
+        n_cells = len(cell_ids)
+        print(f"aggregate demand")
+        demand_history_hc = GetHistoricalDemand.aggregate_demand(df, n_cells)
 
-    for i in range(24):
-        print(f"demand sum for hour {i}: {np.sum(demand_history_hc[i])}")
+        for i in range(24):
+            print(f"demand sum for hour {i}: {np.sum(demand_history_hc[i])}")
 
-    print("save demand history array")
-    daf: DataAccessFacadeBasic = DataAccessFacadeBasic()
-    output_zone_id = output_zone_id or zone_id
-    daf.save_demand_history_array(output_zone_id, today, demand_history_hc)
-    print(f"End calculate historical demand")
+        print("save demand history array")
+        daf: DataAccessFacadeBasic = DataAccessFacadeBasic()
+        output_zone_id = output_zone_id or zone_id
+        daf.save_demand_history_array(output_zone_id, today, demand_history_hc)
+        print(f"End calculate historical demand")
+    except Exception as ex:
+        print(f"Error during historical demand calculation: {ex}")
 
-    return True
+    return {"finished": True}
 
 
 @huey.task(context=True)
@@ -85,16 +89,16 @@ def calculate_demand_prediction(
     output_zone_id: str | None = None,
     from_date: dt.date | None = None,
     task=None,
+    finished: bool = False,
 ):
     """
     Calculate demand prediction matrix for given Zone and date.
     """
 
-    log = get_task_logging_adapter(base_logger, task)
     print(f"Begin calculate demand prediction for zone {zone_id} and date {today}")
     daf: DataAccessFacadeBasic = DataAccessFacadeBasic()
 
-    from_date = from_date or today - dt.timedelta(days=49)
+    from_date = from_date or today - dt.timedelta(days=settings.demand_lag_days)
     to_date = today - dt.timedelta(days=1)
     print(f"find demand history array for date range {from_date} - {to_date}")
     demand_history_dhc = daf.find_demand_history_array(
@@ -120,6 +124,7 @@ def calculate_demand_prediction(
     output_zone_id = output_zone_id or zone_id
     daf.save_demand_prediction_array(output_zone_id, today, demand_prediction_dhc)
     print(f"End calculate demand prediction")
+    return {"finished": True}
 
 
 @huey.task(context=True)
@@ -132,6 +137,7 @@ def calculate_demand_by_weekday(
     output_zone_id: str | None = None,
     from_date: dt.date | None = None,
     task=None,
+    finished: bool = False,
 ):
     """
     Calculate demand by weekday matrix for given Zone and date.
@@ -176,16 +182,16 @@ def calculate_demand_by_weekday(
     output_zone_id = output_zone_id or zone_id
     print(f"saving demand 7d")
     daf.save_demand_prediction_array(output_zone_id, today, demand_dhc)
+    return {"finished": True}
 
 
 @huey.task(context=True)
 def calculate_revenue_matrix(
-    zone_id: str, today: dt.date, output_zone_id: str | None = None, task=None
+    zone_id: str, today: dt.date, output_zone_id: str | None = None, task=None, finished: bool = False,
 ):
     """
     Create and save revenue estimation matrix(.npy) in filesystem
     """
-    log = get_task_logging_adapter(base_logger, task)
     print(f"Begin calculate revenue matrix for zone {zone_id} and date {today}")
     weekday: int = today.weekday()
 
@@ -237,6 +243,7 @@ def calculate_revenue_matrix(
         output_zone_id, from_date=today, parameters_array=parameters_array
     )
     print(f"End calculate revenue matrix")
+    return {"finished": True}
 
 
 @huey.task(context=True)
@@ -246,17 +253,17 @@ def calculate_directions(
     start_date: dt.date | None = None,
     output_zone_id: str | None = None,
     task=None,
-) -> None:
+    finished: bool = False,
+):
     """
     Load:
         - List of rents by zone_id from Internal API.
     Execute:
         Create and save 7 directions matrices(.npy).
     """
-    log = get_task_logging_adapter(base_logger, task)
     print(f"Begin calculate directions for zone {zone_id} and date {today}")
     upper_date = dt.datetime(today.year, today.month, today.day, 0).date()
-    lower_date = start_date or upper_date - dt.timedelta(weeks=6)
+    lower_date = start_date or upper_date - dt.timedelta(weeks=settings.directions_lag_weeks)
 
     daf = DataAccessFacadeBasic()
     print("loading zone grid files")
@@ -280,6 +287,7 @@ def calculate_directions(
             directions_array=d, zone_id=output_zone_id, weekday=weekday
         )
     print("End calculate directions")
+    return {"finished": True}
 
 
 @huey.task(context=True)
@@ -290,7 +298,8 @@ def calculate_historical_demand_for_date_range(
     end_date: dt.date,
     output_zone_id: str | None = None,
     task=None,
-) -> None:
+    finished: bool = False,
+):
     """
     Execute historical demand calculation for given zone and time period.
     """
@@ -301,10 +310,9 @@ def calculate_historical_demand_for_date_range(
     if start_date > end_date:
         log.error("start_date must be smaller than end_date")
         return
-    print("downloading science config")
     today = copy(start_date)
     tasks = []
-    while today < end_date:
+    while today <= end_date:
         print(f"calculating demand for date {today}")
         tasks.append(
             calculate_historical_demand(
@@ -317,12 +325,13 @@ def calculate_historical_demand_for_date_range(
         today += dt.timedelta(days=1)
     _ = [t.get(blocking=True) for t in tasks]
     print(f"End calculating historical demand for date range")
+    return {"finished": True}
 
 
 @huey.task(context=True)
 def create_nearest_petrol_station_distance(
-    zone_id: str, cell_ids: list[str], start_date: dt.datetime, out_zone: str, task=None
-) -> bool:
+    zone_id: str, cell_ids: list[str], start_date: dt.datetime, out_zone: str, task=None, finished: bool = False,
+):
     """
     Create two vectors of length N with distances and times of shortest routes from each cell to station.
     N is a number of cells in base_zone.

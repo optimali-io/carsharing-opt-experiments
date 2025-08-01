@@ -82,9 +82,9 @@ class SpectralClustering:
         self.tolerance: float = tolerance
         self.max_island_size: int = max_island_size
 
-    def get_clusters(self, population: List[Phenotype]) -> List[List[Phenotype]]:
+    def get_clusters(self, population: List[Phenotype], min_size: int) -> List[List[Phenotype]]:
         """
-        Divide the population into clusters based on a similatities between specimen.
+        Divide the population into clusters based on a similarities between specimen.
         :param population: list of Phenotype objects
         :return: List of Lists of Phenotype objects
         """
@@ -98,7 +98,7 @@ class SpectralClustering:
         eigenvalues, eigenvectors = np.linalg.eig(graph_laplacian)
 
         # remove imaginary part of complex numbers (imaginary part exists only because of
-        # iterative algorithm precission issues)
+        # iterative algorithm precision issues)
         eigenvalues, eigenvectors = np.abs(eigenvalues), np.abs(eigenvectors)
 
         # sort
@@ -123,4 +123,4 @@ class SpectralClustering:
 
         clusters = split_clusters(self.max_island_size, clusters)
 
-        return clusters
+        return [c for c in clusters if len(c) >= min_size]  # filter out too small clusters

@@ -393,7 +393,7 @@ class Genome:
 
 class Phenotype:
     """
-    Result of a optimization containing lists of actions for teams and summaries (revenue, costs etc.)
+    Result of an optimization containing lists of actions for teams and summaries (revenue, costs etc.)
     """
 
     def __init__(self, genome):

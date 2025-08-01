@@ -25,15 +25,20 @@ log = logging.getLogger("fleet_manager")
 
 
 def dataframe_from_time_period(dir_path: str, start_date: date, end_date: date):
+    if not os.path.exists(dir_path):
+        return None
     rents_paths = [
         os.path.join(dir_path, path)
         for path in os.listdir(dir_path)
         if path.endswith(".csv")
     ]
-    rents_paths_in_period = _filter_files_by_time_period(
+    paths_in_period = _filter_files_by_time_period(
         rents_paths, start_date, end_date
     )
-    return _dataframe_from_files_list(rents_paths_in_period)
+    if paths_in_period:
+        return _dataframe_from_files_list(paths_in_period)
+    else:
+        return None
 
 
 def _filter_files_by_time_period(
@@ -87,12 +92,10 @@ def load_vehicles_frame(
     spatial_index = Index(settings.SPATIAL_INDEX_PATH)
     date_time_string = start_date_time.strftime("%Y-%m-%dT%H-%M-%S")
 
-    print(date_time_string)
-
     file_path = glob.glob(f"{data_dir}/*{date_time_string}*")[0]
     with open(file_path, "r") as f:
         vehicles = pd.read_csv(f, sep=";")
-    columns = ["ObjId", "Status", "Lon", "Lat", "Fuel", "DateTime"]
+    columns = ["obj_id", "status", "lon", "lat", "fuel", "date_time"]
     vehicles = vehicles[columns]
     vehicles.columns = ["id", "status", "lon", "lat", "fuel", "date_time"]
     vehicles.date_time = pd.to_datetime(vehicles.date_time, errors="coerce")
@@ -103,7 +106,7 @@ def load_vehicles_frame(
         pd.to_numeric, errors="coerce"
     )
     cell_ids = [
-        get_cell_id_by_coords(lon=row.lng, lat=row.lat, index=spatial_index)
+        get_cell_id_by_coords(lon=row.lon, lat=row.lat, index=spatial_index)
         for row in vehicles.itertuples(index=False)
     ]
     vehicles["cell_id"] = cell_ids
@@ -144,7 +147,7 @@ def load_vehicles_from_zone(
         vehicle_models = VehicleModels.model_validate(json.load(f))
 
     for i, v in enumerate(vehicles.itertuples()):
-        lon, lat = v.lng, v.lat
+        lon, lat = v.lon, v.lat
         model = vehicle_models.models[v.model]
         vehicle = Vehicle(
             vehicle_index=i,
