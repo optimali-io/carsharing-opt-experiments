@@ -2,21 +2,16 @@ import logging
 
 from huey import RedisHuey
 from huey.api import Task
-from sqlalchemy.ext.declarative import declarative_base
 
 from settings import Settings
 
 # Configure logging
 logging.basicConfig(
-    level=logging.DEBUG,  # Set the logging level
+    level=logging.WARNING,  # Set the logging level
 )
 
 # load settings
 settings = Settings()
-
-# set database
-SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
-Base = declarative_base()
 
 # set huey
 huey = RedisHuey(settings.APP_NAME, url=settings.REDIS_URL)

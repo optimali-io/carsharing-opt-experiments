@@ -5,9 +5,8 @@ This project is a bunch of scripts necessary to build ZoneFiles.
 
 Before we start:
 
-``cp config.py.example config.py`` <-- fill up
+``cp zone_creator_config.py.example zone_creator_config.py`` <-- fill up
 
-``poetry install``
 
 Ok, scripts should work now.
 
@@ -15,17 +14,17 @@ What do you need?
 -----------------
 
 - kml file with the zone's shape 
-- our awesome shapefile with the operator's grid polygons
-   (same as GeoConfigFiles grid from the backend)
+- Shapefile with the operator's grid polygons, same as `<MAIN_PATH>/data/reference_grid`
 - csv file with petrol stations
 - Here Api developer key
-- QGIS 
+- Some kind of GIS software, for example QGIS 
 
+See example files in `<MAIN_PATH>/data/zones/lodz_synthetic` directory.
 
 What do you have to do?
 -----------------------
 
-Fill config.py file. All files will be saved at ZONE_CONFIG_DIRECTORY.
+Fill zone_creator_config.py file. All files will be saved at ZONE_CONFIG_DIRECTORY.
 Move operators zone kml file to ZONE_CONFIG_DIRECTORY and name it 'zone.kml'.
 
 

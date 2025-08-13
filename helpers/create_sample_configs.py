@@ -36,7 +36,7 @@ def create_default_science_config(zone_id: str) -> ScienceConfig:
     """
     genetic_config = GeneticConfiguration.model_validate(
         {
-            "population_size": 25,
+            "population_size": 100,
             "maximum_time": 1200,
             "maximum_no_improvement": 500,
             "maximum_generation_number": 5000,
@@ -121,7 +121,7 @@ def create_default_vehicle_models(zone_id: str) -> None:
     models = VehicleModels(
         models={
             VehicleModelName.yaris: VehicleModel(
-                average_fuel_consumption=8, tank_capacity=50, fuel_type=FuelType.PETROL
+                average_fuel_consumption=4, tank_capacity=50, fuel_type=FuelType.PETROL
             )
         }
     )

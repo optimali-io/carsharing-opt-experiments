@@ -9,7 +9,7 @@ load_dotenv()
 def get_env_or_raise(var):
     """Gen an environmental variable or raise exception if it can't be found."""
     res = os.getenv(var)
-    if not res:
+    if res is None:
         raise OSError("Env variable not configured")
     return res
 
@@ -20,7 +20,6 @@ class Settings(BaseSettings):
     MAIN_PATH: str = get_env_or_raise("MAIN_PATH")
     APP_NAME: str = "science_core"
     REDIS_URL: str = get_env_or_raise("REDIS_URL")
-    DATABASE_URL: str = get_env_or_raise("DATABASE_URL")
     DATA_DIR: str = MAIN_PATH + "/data"
     RESULTS_DIR: str = MAIN_PATH + "/results"
     ZONES_PATH: str = DATA_DIR + "/zones"

@@ -88,6 +88,10 @@ def optimise_zone_without_data_preparation(zone_id: str, date_time_string: str, 
         optimization_time=optimisation_time,
         science_config=science_config,
     )
+    daf = DataAccessFacadeBasic()
+
+    m = create_map(best_phenotype, zone_data, science_config)
+    daf.save_cpu_optimisation_result(result, date_time, m)
     return result
 
 if __name__ == "__main__":

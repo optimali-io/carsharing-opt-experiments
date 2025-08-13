@@ -193,13 +193,13 @@ class ZoneData(BaseModel):
     allowed_cells_ps: List[Optional[List[int]]] = Field(default_factory=list)
     parking_blacklist_cells: List[Optional[List[int]]] = Field(default_factory=list)
 
-    demand: Optional[np.core.multiarray] = None
-    distance_cell_cell: Optional[np.core.multiarray] = None
-    distance_cell_station_cell: Optional[np.core.multiarray] = None
-    id_cell_station_cell: Optional[np.core.multiarray] = None
-    time_cell_cell: Optional[np.core.multiarray] = None
-    time_cell_station_cell: Optional[np.core.multiarray] = None
-    revenue: Optional[np.core.multiarray] = None
+    demand: Optional[np.ndarray] = None
+    distance_cell_cell: Optional[np.ndarray] = None
+    distance_cell_station_cell: Optional[np.ndarray] = None
+    id_cell_station_cell: Optional[np.ndarray] = None
+    time_cell_cell: Optional[np.ndarray] = None
+    time_cell_station_cell: Optional[np.ndarray] = None
+    revenue: Optional[np.ndarray] = None
 
     action_duration_1: int
     action_duration_2: int

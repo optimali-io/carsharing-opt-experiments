@@ -55,5 +55,6 @@ if __name__ == "__main__":
     # Example usage
     zone_id = "lodz_synthetic"
     date_time_string = "2021-02-28 00:00:00"
-    optimise_zone_with_data_preparation(zone_id, date_time_string)
+    optimise_zone_without_data_preparation(zone_id, date_time_string)
+    print(f"Optimisation for zone {zone_id} on {date_time_string} started. Switch to the Huey consumer to monitor progress.")
 

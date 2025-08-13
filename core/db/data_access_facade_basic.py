@@ -117,6 +117,19 @@ class DataAccessFacadeBasic:
 
         map.save(pth + "/optimisation_map.html")
 
+    def save_cpu_optimisation_result(
+            self, result: OptimisationResult, optimisation_datetime: datetime, map: Map
+    ):
+        """Save optimisation result"""
+        gc = result.science_config.genetic_config
+        pth = f"{settings.RESULTS_DIR}/{result.science_config.zone.id}_{optimisation_datetime.strftime('%Y%m%dT%H%M%S')}_cpu_{gc.topography_type}_{gc.population_size}_{gc.maximum_generation_number}_{gc.island_population}"
+        Path(pth).mkdir(parents=True, exist_ok=True)
+        result.best_phenotype = result.best_phenotype.to_dict()
+        with open(pth + "/result.json", "w") as f:
+            json.dump(result.model_dump(), f)
+
+        map.save(pth + "/optimisation_map.html")
+
     def find_rents_frame(
             self, zone_id: str, from_date: date, to_date: date
     ) -> DataFrame | None:
